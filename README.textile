@@ -1,0 +1,3 @@
+h1. ghissues
+
+ghissues is a lightweight wrapper for Github's issues API written in Go.
