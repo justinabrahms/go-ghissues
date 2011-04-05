@@ -84,6 +84,14 @@ func (ic *IssuesClient) post(url string, data map[string]string) *http.Response 
 	}
 	return response
 }
+func (ic *IssuesClient) get(url string) *http.Response {
+	response, _, err := ic.client.Get(url_string)
+	if (err != nil) {
+		fmt.Printf("Fetch error: " + err.String())
+	}
+	return response
+}
+
 func (ic *IssuesClient) parseJson(response *http.Response, toStructure interface{}) interface{} {
 	b, err := ioutil.ReadAll(response.Body)
 	if (err != nil) {
@@ -98,20 +106,14 @@ func (ic *IssuesClient) parseJson(response *http.Response, toStructure interface
 }
 func (ic *IssuesClient) Search(user, repo, state, term string) []Issue {
 	url_string := fmt.Sprintf("%v/issues/search/%v/%v/%v/%v/", base_api_url, user, repo, state, term)
-	response, _, err := ic.client.Get(url_string)
-	if (err != nil) {
-		fmt.Printf("Fetch error: " + err.String())
-	}
+	response := ic.get(url_string)
 	json := ic.parseJson(response, new(multipleIssueResponse))
 	fmt.Printf("%v", json)
 	return json.(*multipleIssueResponse).Issues
 }
 func (ic *IssuesClient) List(user, repo, state string) []Issue {
 	url_string := fmt.Sprintf("%v/issues/list/%v/%v/%v/", base_api_url, user, repo, state)
-	response, _, err := ic.client.Get(url_string)
-	if (err != nil) {
-		fmt.Printf("Fetch error: " + err.String())
-	}
+	response := ic.get(url_string)
 	json := ic.parseJson(response, new(multipleIssueResponse))
 	return json.(*multipleIssueResponse).Issues
 }
@@ -126,10 +128,7 @@ func (ic *IssuesClient) Create(user, repo, title, body string) Issue {
 }
 func (ic *IssuesClient) Detail(user, repo string, issueNumber int) Issue {
 	url_string := fmt.Sprintf("%v/issues/show/%v/%v/%v", base_api_url, user, repo, issueNumber)
-	response, _, err := ic.client.Get(url_string)
-	if (err != nil) {
-		fmt.Printf("Fetch error: " + err.String())
-	}
+	response := ic.get(url_string)
 	json := ic.parseJson(response, new(singleIssueResponse))
 	return json.(*singleIssueResponse).Issue
 }
@@ -159,10 +158,7 @@ func (ic *IssuesClient) Reopen(user, repo string, issueNumber int) Issue {
 
 func (ic *IssuesClient) ListComments(user, repo string, issueNumber int) []Comment {
 	url_string := fmt.Sprintf("%v/issues/comments/%v/%v/%v/", base_api_url, user, repo, issueNumber)
-	response, _, err := ic.client.Get(url_string)
-	if (err != nil) {
-		fmt.Printf("Fetch error: " + err.String())
-	}
+	response := ic.get(url_string)
 	json := ic.parseJson(response, new(multipleCommentResponse))
 	return json.(*multipleCommentResponse).Comments
 }
@@ -177,10 +173,7 @@ func (ic *IssuesClient) AddComment(user, repo string, issueNumber int, comment s
 
 func (ic *IssuesClient) ListLabels(user, repo string) []Label {
 	url_string := fmt.Sprintf("%v/issues/labels/%v/%v/", base_api_url, user, repo)
-	response, _, err := ic.client.Get(url_string)
-	if (err != nil) {
-		fmt.Printf("Fetch error: " + err.String())
-	}
+	response := ic.get(url_string)
 	json := ic.parseJson(response, new(multipleLabelResponse))
 	return json.(*multipleLabelResponse).Labels
 }
