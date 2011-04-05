@@ -209,38 +209,3 @@ func (ic *IssuesClient) RemoveLabelFromIssue(user, repo string, issueNumber int,
 	json := ic.parseJson(response, new(multipleLabelResponse))
 	return json.(*multipleLabelResponse).Labels
 }
-
-func main() {
-	c := NewClient("justinlilly", "ce87a1af897da128ac9a98059bfe2a41")
-	// LIST
-	// list := c.List("justinlilly", "justinlilly.github.com", "open")
-	// SEARCH
-	// list := c.Search("justinlilly", "justinlilly.github.com", "open", "curl")
-	// for i := range list {
-	// 	item := list[i]
-	// 	fmt.Printf("%v: %s", item.Number, item.Title)
-	// }
-	// CREATE
-	// created := c.Create("justinlilly", "justinlilly.github.com", "another.", "wee.")
-	// fmt.Println("Got: " + fmt.Sprintf("%v", created))
-	// DETAIL
-	// issue := c.Detail("justinlilly", "justinlilly.github.com", 5)
-	// fmt.Printf("#%v %v: %v", issue.Number, issue.Title, issue.Body))
-	// LIST COMMENTS
-	// list := c.ListComments("justinlilly", "justinlilly.github.com", 5)
-	// for i := range list {
-	// 	item := list[i]
-	// 	fmt.Printf("%v: %s", item.User, item.Body)
-	// }
-	// CREATE COMMENT
-	// item := c.AddComment("justinlilly", "justinlilly.github.com", 5, "This is my test API comment.")
-	// fmt.Printf("%v: %v", item.User, item.Body)
-	// LIST LABELS
-	// list := c.ListLabels("justinlilly", "justinlilly.github.com")
-	// for i := range list {
-	// 	item := list[i]
-	// 	fmt.Printf("%v", item)
-	// }
-	// ADD LABEL TO REPO
-	c.RemoveLabelFromRepo("justinlilly", "justinlilly.github.com", "viaAPI")
-}
