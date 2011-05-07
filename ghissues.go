@@ -6,13 +6,10 @@ import (
 	"fmt"
 	"json"
 	"io/ioutil"
+        "os"
 )
 
 const base_api_url string = "http://github.com/api/v2/json"
-
-type JsonError struct {
-	error string
-}
 
 type Issue struct {
 	Gravatar_id string
@@ -29,6 +26,7 @@ type Issue struct {
 	Labels []Label
 	State string
 }
+
 type Comment struct {
 	Gravatar_id string
 	Created_at string
@@ -37,14 +35,16 @@ type Comment struct {
 	Id int
 	User string
 }
+
 type Label string
-// @@@ TODO
-type PullRequest struct {
+
+type PullRequest struct { // @@@ Unimplemented
 	issue Issue
 	pull_request_url string
 	html_url string
 	patch_url string
 }
+
 type IssuesClient struct {
 	username string
 	token string
@@ -71,141 +71,185 @@ type multipleLabelResponse struct {
 func NewClient(username, token string) *IssuesClient {
 	return &IssuesClient{username, token, new(http.Client)}
 }
-func (ic *IssuesClient) post(url string, data map[string]string) *http.Response {
+
+func (ic *IssuesClient) post(url string, data map[string]string) (*http.Response, os.Error) {
 	if _, username_exists := data["login"]; !username_exists {
 		data["login"] = ic.username
 	}
 	if _, token_exists := data["token"]; !token_exists {
 		data["token"] = ic.token
 	}
-	response, err := ic.client.PostForm(url, data)
-	if (err != nil) {
-		fmt.Printf("Fetch error: %v", err.String())
-	}
-	return response
-}
-func (ic *IssuesClient) get(url string) *http.Response {
-	response, _, err := ic.client.Get(url_string)
-	if (err != nil) {
-		fmt.Printf("Fetch error: " + err.String())
-	}
-	return response
+	return ic.client.PostForm(url, data)
 }
 
-func (ic *IssuesClient) parseJson(response *http.Response, toStructure interface{}) interface{} {
+func (ic *IssuesClient) get(url string) (*http.Response, os.Error) {
+	response, _, err := ic.client.Get(url)
+	if (response.StatusCode != 200) {
+		return response, os.NewError(
+			fmt.Sprintf("Got a %v status code on fetch of %v.", response.StatusCode, url))
+	}
+	return response, err
+}
+
+func (ic *IssuesClient) parseJson(response *http.Response, toStructure interface{}) (interface{}, os.Error) {
 	b, err := ioutil.ReadAll(response.Body)
 	if (err != nil) {
-		// @@@ what to do here? Panic? Possibly return an error type.
-		fmt.Printf("Error reading response body. " + err.String())
+                return toStructure, err
 	}
 	err2 := json.Unmarshal(b, toStructure)
-	if (err2 != nil) {
-		fmt.Printf("Unmarshalling Error: " + err2.String())
-	}
-	return toStructure
+	return toStructure, err2
 }
-func (ic *IssuesClient) Search(user, repo, state, term string) []Issue {
+
+func (ic *IssuesClient) Search(user, repo, state, term string) ([]Issue, os.Error) {
 	url_string := fmt.Sprintf("%v/issues/search/%v/%v/%v/%v/", base_api_url, user, repo, state, term)
-	response := ic.get(url_string)
-	json := ic.parseJson(response, new(multipleIssueResponse))
-	fmt.Printf("%v", json)
-	return json.(*multipleIssueResponse).Issues
+	response, err := ic.get(url_string)
+	if (err != nil) {
+                return make([]Issue, 0), err
+	}
+	json, err2 := ic.parseJson(response, new(multipleIssueResponse))
+	return json.(*multipleIssueResponse).Issues, err2
 }
-func (ic *IssuesClient) List(user, repo, state string) []Issue {
+
+func (ic *IssuesClient) List(user, repo, state string) ([]Issue, os.Error) {
 	url_string := fmt.Sprintf("%v/issues/list/%v/%v/%v/", base_api_url, user, repo, state)
-	response := ic.get(url_string)
-	json := ic.parseJson(response, new(multipleIssueResponse))
-	return json.(*multipleIssueResponse).Issues
+        response, err := ic.get(url_string)
+	if (err != nil) {
+                return make([]Issue, 0), err
+	}
+	json, err2 := ic.parseJson(response, new(multipleIssueResponse))
+	return json.(*multipleIssueResponse).Issues, err2
 }
-func (ic *IssuesClient) Create(user, repo, title, body string) Issue {
+
+func (ic *IssuesClient) Create(user, repo, title, body string) (Issue, os.Error) {
 	url_string := fmt.Sprintf("%v/issues/open/%v/%v/", base_api_url, user, repo)
 	post_data := make(map[string]string)
 	post_data["title"] = title
 	post_data["body"] = body
-	response := ic.post(url_string, post_data)
-	json := ic.parseJson(response, new(singleIssueResponse))
-	return json.(*singleIssueResponse).Issue
+	response, err := ic.post(url_string, post_data)
+	if (err != nil) {
+                return *new(Issue), err
+	}
+	json, err2 := ic.parseJson(response, new(singleIssueResponse))
+	return json.(*singleIssueResponse).Issue, err2
 }
-func (ic *IssuesClient) Detail(user, repo string, issueNumber int) Issue {
+
+func (ic *IssuesClient) Detail(user, repo string, issueNumber int) (Issue, os.Error) {
 	url_string := fmt.Sprintf("%v/issues/show/%v/%v/%v", base_api_url, user, repo, issueNumber)
-	response := ic.get(url_string)
-	json := ic.parseJson(response, new(singleIssueResponse))
-	return json.(*singleIssueResponse).Issue
+	response, err := ic.get(url_string)
+	if (err != nil) {
+                return *new(Issue), err
+	}
+	json, err2 := ic.parseJson(response, new(singleIssueResponse))
+	return json.(*singleIssueResponse).Issue, err2
 }
-func (ic *IssuesClient) Edit(user, repo string, issueNumber int, title, body string) Issue {
+
+func (ic *IssuesClient) Edit(user, repo string, issueNumber int, title, body string) (Issue, os.Error) {
 	url_string := fmt.Sprintf("%v/issues/edit/%v/%v/%v/", base_api_url, user, repo, issueNumber)
 	post_data := make(map[string]string)
 	post_data["title"] = title
 	post_data["body"] = body
-	response := ic.post(url_string, post_data)
-	json := ic.parseJson(response, new(singleIssueResponse))
-	return json.(*singleIssueResponse).Issue
-}
-func (ic *IssuesClient) Close(user, repo string, issueNumber int) Issue {
-	url_string := fmt.Sprintf("%v/issues/close/%v/%v/%v/", base_api_url, user, repo, issueNumber)
-	post_data := make(map[string]string)
-	response := ic.post(url_string, post_data)
-	json := ic.parseJson(response, new(singleIssueResponse))
-	return json.(*singleIssueResponse).Issue
-}
-func (ic *IssuesClient) Reopen(user, repo string, issueNumber int) Issue {
-	url_string := fmt.Sprintf("%v/issues/reopen/%v/%v/%v/", base_api_url, user, repo, issueNumber)
-	post_data := make(map[string]string)
-	response := ic.post(url_string, post_data)
-	json := ic.parseJson(response, new(singleIssueResponse))
-	return json.(*singleIssueResponse).Issue
+	response, err := ic.post(url_string, post_data)
+        if (err != nil) {
+                return *new(Issue), err
+        }
+	json, err2 := ic.parseJson(response, new(singleIssueResponse))
+	return json.(*singleIssueResponse).Issue, err2
 }
 
-func (ic *IssuesClient) ListComments(user, repo string, issueNumber int) []Comment {
-	url_string := fmt.Sprintf("%v/issues/comments/%v/%v/%v/", base_api_url, user, repo, issueNumber)
-	response := ic.get(url_string)
-	json := ic.parseJson(response, new(multipleCommentResponse))
-	return json.(*multipleCommentResponse).Comments
+func (ic *IssuesClient) Close(user, repo string, issueNumber int) (Issue, os.Error) {
+	url_string := fmt.Sprintf("%v/issues/close/%v/%v/%v/", base_api_url, user, repo, issueNumber)
+	post_data := make(map[string]string)
+	response, err := ic.post(url_string, post_data)
+        if (err != nil) {
+                return *new(Issue), err
+        }
+	json, err2 := ic.parseJson(response, new(singleIssueResponse))
+	return json.(*singleIssueResponse).Issue, err2
 }
-func (ic *IssuesClient) AddComment(user, repo string, issueNumber int, comment string) Comment {
+
+func (ic *IssuesClient) Reopen(user, repo string, issueNumber int) (Issue, os.Error) {
+	url_string := fmt.Sprintf("%v/issues/reopen/%v/%v/%v/", base_api_url, user, repo, issueNumber)
+	post_data := make(map[string]string)
+	response, err := ic.post(url_string, post_data)
+        if (err != nil) {
+                return *new(Issue), err
+        }
+	json, err2 := ic.parseJson(response, new(singleIssueResponse))
+	return json.(*singleIssueResponse).Issue, err2
+}
+
+func (ic *IssuesClient) ListComments(user, repo string, issueNumber int) ([]Comment, os.Error) {
+	url_string := fmt.Sprintf("%v/issues/comments/%v/%v/%v/", base_api_url, user, repo, issueNumber)
+	response, err := ic.get(url_string)
+        if (err != nil) {
+                return make([]Comment, 0), err
+        }
+	json, err2 := ic.parseJson(response, new(multipleCommentResponse))
+	return json.(*multipleCommentResponse).Comments, err2
+}
+
+func (ic *IssuesClient) AddComment(user, repo string, issueNumber int, comment string) (Comment, os.Error) {
 	url_string := fmt.Sprintf("%v/issues/comment/%v/%v/%v/", base_api_url, user, repo, issueNumber)
 	post_data := make(map[string]string)
 	post_data["comment"] = comment
-	response := ic.post(url_string, post_data)
-	json := ic.parseJson(response, new(singleCommentResponse))
-	return json.(*singleCommentResponse).Comment
+	response, err := ic.post(url_string, post_data)
+        if (err != nil) {
+                return *new(Comment), err
+        }
+	json, err2 := ic.parseJson(response, new(singleCommentResponse))
+	return json.(*singleCommentResponse).Comment, err2
 }
 
-func (ic *IssuesClient) ListLabels(user, repo string) []Label {
+func (ic *IssuesClient) ListLabels(user, repo string) ([]Label, os.Error) {
 	url_string := fmt.Sprintf("%v/issues/labels/%v/%v/", base_api_url, user, repo)
-	response := ic.get(url_string)
-	json := ic.parseJson(response, new(multipleLabelResponse))
-	return json.(*multipleLabelResponse).Labels
+	response, err := ic.get(url_string)
+        if (err != nil) {
+                return make([]Label, 0), err
+        }
+	json, err2 := ic.parseJson(response, new(multipleLabelResponse))
+	return json.(*multipleLabelResponse).Labels, err2
 }
 
-func (ic *IssuesClient) AddLabelToRepo(user, repo, label string) []Label {
+func (ic *IssuesClient) AddLabelToRepo(user, repo, label string) ([]Label, os.Error) {
 	url_string := fmt.Sprintf("%v/issues/label/add/%v/%v/%v/", base_api_url, user, repo, label)
 	post_data := make(map[string]string)
-	response := ic.post(url_string, post_data)
-	json := ic.parseJson(response, new(multipleLabelResponse))
-	return json.(*multipleLabelResponse).Labels
+	response, err := ic.post(url_string, post_data)
+        if (err != nil) {
+                return make([]Label, 0), err
+        }
+	json, err2 := ic.parseJson(response, new(multipleLabelResponse))
+	return json.(*multipleLabelResponse).Labels, err2
 }
 
-func (ic *IssuesClient) AddLabelToIssue(user, repo string, issueNumber int, label string) []Label {
+func (ic *IssuesClient) AddLabelToIssue(user, repo string, issueNumber int, label string) ([]Label, os.Error) {
 	url_string := fmt.Sprintf("%v/issues/label/add/%v/%v/%v/%v/", base_api_url, user, repo, label, issueNumber)
 	post_data := make(map[string]string)
-	response := ic.post(url_string, post_data)
-	json := ic.parseJson(response, new(multipleLabelResponse))
-	return json.(*multipleLabelResponse).Labels
+	response, err := ic.post(url_string, post_data)
+        if (err != nil) {
+                return make([]Label, 0), err
+        }
+	json, err2 := ic.parseJson(response, new(multipleLabelResponse))
+	return json.(*multipleLabelResponse).Labels, err2
 }
 
-func (ic *IssuesClient) RemoveLabelFromRepo(user, repo, label string) []Label {
+func (ic *IssuesClient) RemoveLabelFromRepo(user, repo, label string) ([]Label, os.Error) {
 	url_string := fmt.Sprintf("%v/issues/label/remove/%v/%v/%v/", base_api_url, user, repo, label)
 	post_data := make(map[string]string)
-	response := ic.post(url_string, post_data)
-	json := ic.parseJson(response, new(multipleLabelResponse))
-	return json.(*multipleLabelResponse).Labels
+	response, err := ic.post(url_string, post_data)
+        if (err != nil) {
+                return make([]Label, 0), err
+        }
+	json, err2 := ic.parseJson(response, new(multipleLabelResponse))
+	return json.(*multipleLabelResponse).Labels, err2
 }
 
-func (ic *IssuesClient) RemoveLabelFromIssue(user, repo string, issueNumber int, label string) []Label {
+func (ic *IssuesClient) RemoveLabelFromIssue(user, repo string, issueNumber int, label string) ([]Label, os.Error) {
 	url_string := fmt.Sprintf("%v/issues/label/remove/%v/%v/%v/%v/", base_api_url, user, repo, label, issueNumber)
 	post_data := make(map[string]string)
-	response := ic.post(url_string, post_data)
-	json := ic.parseJson(response, new(multipleLabelResponse))
-	return json.(*multipleLabelResponse).Labels
+	response, err := ic.post(url_string, post_data)
+        if (err != nil) {
+                return make([]Label, 0), err
+        }
+	json, err2 := ic.parseJson(response, new(multipleLabelResponse))
+	return json.(*multipleLabelResponse).Labels, err2
 }

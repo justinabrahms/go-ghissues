@@ -1,6 +1,6 @@
 include $(GOROOT)/src/Make.inc
 
-TARG=ghissues
+TARG=github.com/justinlilly/go-ghissues
 GOFILES=\
 	ghissues.go\
 
